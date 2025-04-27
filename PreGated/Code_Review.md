@@ -1,4 +1,6 @@
+# Pre-Gated代码分析
 项目源码：https://github.com/ranggihwang/Pregated_MoE
+
 论文链接：https://arxiv.org/pdf/2308.12066
 ## 论文方案分析
 
@@ -55,16 +57,18 @@ Pre-gated 的关键流水线逻辑在 MoE 计算的核心 Kernel Runner 中实�
         3.  `fetcher_context_->get_weights(...)`: 获取当前层的专家参数指针。
         4.  **【GPU 计算当前层】**: 执行当前层的 FFN 计算。
         5.  **(无预取)**.
-![[Core_Code.png]]
+![Core_Code](Image/Core_Code.png)
+可以看到，在MoE的Gate处理区域，只使用了permuted_experts_作为参数，并没有所谓预测的专家参数。
 ## 预测 (Gating) 机制
 
 也就是说**它使用当前 MoE 层通过门控网络（Gating Network）计算并排序后实际选择的专家列表 (`permuted_experts_`)，直接作为下一层需要预取的专家列表。** 这相当于假设下一层激活的专家与当前层相同。==***根本不存在所谓的预测！！！***==
 可以使用以下的PipeLine进行展示
-![[PipeLine-Page-1.png]]
+![PipeLine-Page-1](Image/PipeLine-Page-1.png)
 
 ## 错误处理机制
 那么问题就来了：那么如果如果两层的专家列表不相同会发生什么？很显然，会**权重获取错误**，进而**计算使用错误权重**，导致计算结果大幅出现问题，即生成内容的回答也会出现乱码。
 但是在当前的论文中缺少相应的验证，并且代码中的Input Token使用的为随机生成的词典组合，不具有任何意义。
-经过添加T5-Tokenizer，使用自定义的Input Token，并修改Faster Transformer框架将Output进行输出，得到结果如下：
-![[Output.png]]
+
+我在模型文件中添加T5-Tokenizer，从而使用自定义的Input Token，并修改Faster Transformer框架将Output进行输出，得到结果如下：
+![Output](Image/Output.png)
 可以看到，对于Pre-Gated方案，由于专家列表获取错误，无法正确生成内容，更加证明了该代码方案的局限性。
